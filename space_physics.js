@@ -1,35 +1,43 @@
-// Space Physics Mod (r74n Sandboxels)
-// Floating pixels, orbital gravity, sticking, friction heating
-// Drop-in mod, GitHub RAW–URL compatible
+// Space Physics Mod — r74n Sandboxels
+// Global zero-G, orbital gravity, sticking, friction heating
 
 enabledMods.push("space_physics.js");
 
 modInfo = {
     name: "Space Physics",
-    description: "Zero-G orbital gravity, pixel adhesion, and friction-based heating.",
+    description: "Global zero-G with orbital gravity, sticking, and friction heating.",
     author: "you"
 };
 
 runAfterLoad(() => {
 
     /* ========= CONFIG ========= */
-    const G = 0.002;          // gravity strength
-    const STICK_DIST = 1.5;   // distance where pixels weld
-    const HEAT_MULT = 5;      // collision/friction → heat
-    const DRAG = 0.999;       // tiny damping so speeds don't explode
-    const SOFTENING = 0.01;   // prevents infinite force at zero distance
+    const G = 0.003;
+    const STICK_DIST = 1.6;
+    const HEAT_MULT = 6;
+    const DRAG = 0.9995;
+    const SOFTENING = 0.05;
 
-    /* ========= PHYSICS ========= */
-    tickFunctions.push(function spacePhysicsTick() {
+    /* ========= CATEGORY ========= */
+    if (!categories.space) {
+        categories.space = {
+            name: "Space",
+            color: "#666666"
+        };
+    }
+
+    /* ========= GLOBAL PHYSICS ========= */
+    tickFunctions.push(function spacePhysics() {
         const pixels = currentPixels;
 
         for (let i = 0; i < pixels.length; i++) {
             const p1 = pixels[i];
             if (!p1 || p1.dead) continue;
 
+            // override default gravity
             if (p1.vx === undefined) p1.vx = 0;
             if (p1.vy === undefined) p1.vy = 0;
-            if (p1.temp === undefined) p1.temp = 20;
+            p1.vy -= 0.1; // cancel Sandboxels gravity
 
             for (let j = i + 1; j < pixels.length; j++) {
                 const p2 = pixels[j];
@@ -37,14 +45,13 @@ runAfterLoad(() => {
 
                 if (p2.vx === undefined) p2.vx = 0;
                 if (p2.vy === undefined) p2.vy = 0;
-                if (p2.temp === undefined) p2.temp = 20;
 
                 const dx = p2.x - p1.x;
                 const dy = p2.y - p1.y;
                 const distSq = dx*dx + dy*dy + SOFTENING;
                 const dist = Math.sqrt(distSq);
 
-                /* --- ORBITAL GRAVITY --- */
+                // gravity
                 const force = G / distSq;
                 const fx = force * dx;
                 const fy = force * dy;
@@ -54,14 +61,12 @@ runAfterLoad(() => {
                 p2.vx -= fx;
                 p2.vy -= fy;
 
-                /* --- STICKING + FRICTION HEAT --- */
+                // sticking + friction heat
                 if (dist < STICK_DIST) {
                     const avx = (p1.vx + p2.vx) / 2;
                     const avy = (p1.vy + p2.vy) / 2;
 
-                    const rvx = p1.vx - p2.vx;
-                    const rvy = p1.vy - p2.vy;
-                    const speed = Math.hypot(rvx, rvy);
+                    const speed = Math.hypot(p1.vx - p2.vx, p1.vy - p2.vy);
                     const heat = speed * HEAT_MULT;
 
                     p1.vx = avx;
@@ -79,31 +84,19 @@ runAfterLoad(() => {
         }
     });
 
-    /* ========= ELEMENTS ========= */
-
-    elements.space_rock = {
-        color: "#8a8a8a",
+    /* ========= SPACE ELEMENT ========= */
+    elements.space_dust = {
+        color: "#aaaaaa",
         behavior: behaviors.POWDER,
-        category: "land",
+        category: "space",
         state: "solid",
-        density: 3000,
-        tempHigh: 1200,
+        density: 2000,
+        tempHigh: 1000,
         stateHigh: "lava",
         tick(pixel) {
-            if (pixel.vx === undefined) pixel.vx = 0;
-            if (pixel.vy === undefined) pixel.vy = 0;
-            if (pixel.temp === undefined) pixel.temp = 20;
+            if (pixel.vx === undefined) pixel.vx = (Math.random() - 0.5) * 2;
+            if (pixel.vy === undefined) pixel.vy = (Math.random() - 0.5) * 2;
         }
-    };
-
-    elements.space_metal = {
-        color: "#b0b0b0",
-        behavior: behaviors.SOLID,
-        category: "solids",
-        state: "solid",
-        density: 7800,
-        tempHigh: 1500,
-        stateHigh: "molten_metal"
     };
 
 });
